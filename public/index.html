@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Idol Whale Hunter - Real-time Dashboard</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #090d16;
+            color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 20px;
+        }
+        .container { max-width: 1560px; margin: 0 auto; }
+        .header-card {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        .title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .title-row h1 { font-size: 22px; color: #ec4899; font-weight: 700; }
+        .badge-live {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+        .subtitle { color: #94a3b8; font-size: 13px; margin-top: 6px; line-height: 1.5; }
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        select, input[type="text"] {
+            background-color: #1f2937;
+            color: #f8fafc;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 13px;
+            outline: none;
+        }
+        select:focus, input[type="text"]:focus { border-color: #ec4899; }
+        .male-filter-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(56, 189, 248, 0.15);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button {
+            background-color: #db2777;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #ec4899; }
+        button:disabled { background-color: #4b5563; cursor: not-allowed; }
+        .table-card {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        thead tr {
+            background-color: #1e293b;
+            color: #cbd5e1;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #334155;
+        }
+        th, td { padding: 14px 12px; border-bottom: 1px solid #1f2937; font-size: 13.5px; vertical-align: middle; }
+        tbody tr:hover { background-color: rgba(30, 41, 59, 0.55); }
+        .user-name { font-weight: 700; color: #ffffff; font-size: 14.5px; display: flex; align-items: center; gap: 6px; }
+        .badge-male {
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.45);
+            font-size: 11px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+        .badge-female {
+            background: rgba(244, 114, 182, 0.15);
+            color: #f472b6;
+            border: 1px solid rgba(244, 114, 182, 0.35);
+            font-size: 11px;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .sub-text { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+        .user-link {
+            color: #38bdf8;
+            text-decoration: none;
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .user-link:hover { text-decoration: underline; }
+        .btn-app {
+            background: linear-gradient(135deg, #fe2c55, #25f4ee);
+            color: #000;
+            font-weight: 800;
+            font-size: 11px;
+            padding: 4px 9px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-web {
+            display: inline-flex;
+            align-items: center;
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+        .diamond-text { color: #fbbf24; font-weight: 700; font-size: 15px; }
+        .diamond-zero { color: #64748b; font-weight: 600; font-size: 13px; }
+        .muc-choi-text { color: #34d399; font-weight: 800; font-size: 15px; }
+        .badge-pk {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
+        .badge-normal {
+            background: #334155;
+            color: #cbd5e1;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+        .badge-gifter {
+            background: rgba(79, 70, 229, 0.25);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .badge-fanclub {
+            background: rgba(249, 115, 22, 0.25);
+            color: #fdba74;
+            border: 1px solid rgba(249, 115, 22, 0.55);
+            font-weight: 700;
+            padding: 5px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+        .badge-gallery {
+            display: inline-block;
+            background: rgba(168, 85, 247, 0.18);
+            color: #e9d5ff;
+            border: 1px solid rgba(168, 85, 247, 0.45);
+            font-size: 12px;
+            padding: 4px 9px;
+            border-radius: 6px;
+            margin: 2px;
+            font-weight: 700;
+        }
+        .thumb-box {
+            display: block;
+            width: 130px;
+            height: 76px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #475569;
+            position: relative;
+        }
+        .thumb-box img { width: 100%; height: 100%; object-fit: cover; }
+        .empty-row { text-align: center; color: #64748b; padding: 36px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-card">
+            <div>
+                <div class="title-row">
+                    <h1>🎯 TikTok Idol Whale Hunter</h1>
+                    <span class="badge-live" id="statusBadge">Dual-Engine 5s/Phòng</span>
+                </div>
+                <p class="subtitle">
+                    • <b>Engine 1 (Phòng Trưng Bày):</b> Gifter Level ≥ 15 & Quà ≥ 500 💎 (Hiển thị: <code>Tên(id) xSố_lượng</code> - Không cộng dồn kim cương)<br>
+                    • <b>Engine 2 (Live / PK / Mức Chơi):</b> Gifter Level ≥ 15, Ưu tiên Nam & Chụp Viewers tự nhiên
+                </p>
+            </div>
+
+            <div class="controls">
+                <label class="male-filter-label">
+                    <input type="checkbox" id="prioritizeMaleCheckbox" onchange="renderAllRows()" checked />
+                    🚹 Ưu tiên hiển thị Nam
+                </label>
+                <select id="modeSelect">
+                    <option value="search">1. Lướt trong luồng Tìm kiếm (Search & Filter)</option>
+                    <option value="category">2. Lướt theo Category (Danh mục có sẵn)</option>
+                    <option value="farming">3. "Nuôi" thuật toán cho tài khoản Bot (Account Farming)</option>
+                </select>
+                <input id="keywordInput" type="text" value="idol pk" placeholder="Từ khóa ngách Idol..." />
+                <button id="startBtn" onclick="startBot()">🚀 Chạy Auto-Scroll (5s/Phòng)</button>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>
+                            <div>1. Tên & Giới Tính</div>
+                            <select id="regionFilterSelect" onchange="renderAllRows()" style="margin-top: 6px; padding: 4px 8px; font-size: 11.5px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                                <option value="all">🌐 Tất cả (Việt + Ngoại)</option>
+                                <option value="Việt">🇻🇳 Chỉ bắt User Việt</option>
+                                <option value="Nước ngoài">🌍 Chỉ bắt User Nước Ngoài</option>
+                            </select>
+                        </th>
+                        <th>2. User ID</th>
+                        <th>3. Thời Gian</th>
+                        <th>4. TikTok Gift Gallery (≥500 💎)</th>
+                        <th>5. Số Kim Cương (Xu Gốc)</th>
+                        <th>6. Gifter Level</th>
+                        <th>7. Tim Đội (Fanclub)</th>
+                        <th>8. Mức Chơi (Viewers)</th>
+                        <th>9. Hình Ảnh Khoảnh Khắc</th>
+                    </tr>
+                </thead>
+                <tbody id="whaleTableBody">
+                    <tr id="emptyStateRow">
+                        <td colspan="9" class="empty-row">Chưa có dữ liệu. Hãy bấm "🚀 Chạy Auto-Scroll (5s/Phòng)" để bắt đầu...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const tbody = document.getElementById('whaleTableBody');
+        let allWhaleRecords = [];
+
+        function formatTime(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleTimeString('vi-VN') + ' - ' + d.toLocaleDateString('vi-VN');
+        }
+
+        function openInTikTokApp(uniqueId, userId) {
+            const appUrl = `snssdk1180://user/profile/${userId}`;
+            const fallbackAppUrl = `tiktok://user?unique_id=${uniqueId}`;
+
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = appUrl;
+            document.body.appendChild(iframe);
+
+            setTimeout(() => {
+                iframe.src = fallbackAppUrl;
+                setTimeout(() => document.body.removeChild(iframe), 1000);
+            }, 300);
+        }
+
+        function detectRegionClient(item) {
+            if (item.region) return item.region;
+            const text = `${item.nickname || ''} ${item.unique_id || ''}`;
+            if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(text)) return 'Việt';
+            return 'Việt';
+        }
+
+        function createRowHTML(item) {
+            let galleryArr = [];
+            try {
+                galleryArr = typeof item.gift_gallery_500 === 'string' 
+                    ? JSON.parse(item.gift_gallery_500) 
+                    : (item.gift_gallery_500 || []);
+            } catch (e) {}
+
+            // Cột 4: Hiển thị tất cả món quà >=500: Galaxy(id) x2, Swan(id) x1, Money Gun(id) x1
+            const galleryBadges = galleryArr.length > 0
+                ? galleryArr.map(g => `<span class="badge-gallery">${g}</span>`).join(', ')
+                : `<span class="sub-text">Chưa mở / Ẩn quà ≥500</span>`;
+
+            const rawDiamonds = Number(item.raw_diamonds || 0);
+            const mucChoi = Number(item.muc_choi || 0);
+            const isFromGalleryOnly = item.gift_name === 'Phòng Trưng Bày';
+            let diamondColumnHTML = '';
+
+            // Cột 5: Hiển thị tổng số kim cương cộng lại của Phòng trưng bày (VD: 3.199) HOẶC xu tặng trực tiếp
+            if (rawDiamonds > 0) {
+                if (isFromGalleryOnly || item.gift_name === 'Mức chơi (Viewers)') {
+                    diamondColumnHTML = `
+                        <div class="diamond-text">💎 ${rawDiamonds.toLocaleString('vi-VN')}</div>
+                        <div class="sub-text">Tổng kim cương Phòng Trưng Bày</div>
+                    `;
+                } else {
+                    const pkBadge = item.is_pk 
+                        ? `<span class="badge-pk">⚔️ ĐANG PK</span>` 
+                        : `<span class="badge-normal">Live thường</span>`;
+                    diamondColumnHTML = `
+                        <div class="diamond-text">💎 ${rawDiamonds.toLocaleString('vi-VN')}</div>
+                        <div class="sub-text">${pkBadge}</div>
+                    `;
+                }
+            } else {
+                diamondColumnHTML = `<span class="sub-text">—</span>`;
+            }
+
+            // Cột 3 (Thời Gian): Phòng Trưng Bày để trống (—)
+            const timeColumnHTML = (!isFromGalleryOnly && item.started_at)
+                ? `<div style="font-weight:700; color:#fbbf24;">${formatTime(item.started_at)}</div>`
+                : `<span class="sub-text">—</span>`;
+
+            // Cột 8 (Mức chơi): Nếu User Offline trong Phòng trưng bày (mucChoi === 0) thì KHÔNG hiển thị gì cả
+            const mucChoiHTML = (!isFromGalleryOnly && mucChoi > 0)
+                ? `<div class="muc-choi-text">🔥 ${mucChoi.toLocaleString('vi-VN')} 💎</div>`
+                : `<span class="sub-text">—</span>`;
+
+            // Cột 9 (Hình ảnh): Phòng trưng bày không cần chụp ảnh
+            const screenshotHTML = (!isFromGalleryOnly && item.screenshot_url)
+                ? `<a href="${item.screenshot_url}" target="_blank" class="thumb-box" title="Bấm để xem ảnh lớn">
+                        <img src="${item.screenshot_url}" />
+                   </a>`
+                : `<span class="sub-text">—</span>`;
+
+            const gender = item.gender || 'Nam';
+            const genderBadge = gender === 'Nữ'
+                ? `<span class="badge-female">♀️ Nữ</span>`
+                : `<span class="badge-male">♂️ Nam</span>`;
+
+            const region = detectRegionClient(item);
+            const regionBadge = region === 'Nước ngoài'
+                ? `<span style="background:rgba(245,158,11,0.18); color:#fbbf24; border:1px solid rgba(245,158,11,0.4); font-size:11px; padding:1px 6px; border-radius:4px; font-weight:700;">🌍 Nước ngoài</span>`
+                : `<span style="background:rgba(16,185,129,0.18); color:#34d399; border:1px solid rgba(16,185,129,0.4); font-size:11px; padding:1px 6px; border-radius:4px; font-weight:700;">🇻🇳 Việt</span>`;
+
+            return `
+                <tr>
+                    <td>
+                        <div class="user-name">${item.nickname} ${genderBadge} ${regionBadge}</div>
+                        <div class="sub-text">Phòng Idol: @${item.idol_unique_id}</div>
+                    </td>
+                    <td>
+                        <span class="user-link" onclick="openInTikTokApp('${item.unique_id}', '${item.tiktok_user_id}')" title="Bấm để mở App TikTok">@${item.unique_id}</span>
+                        <div class="sub-text">UID: ${item.tiktok_user_id}</div>
+                        <div style="display: flex; gap: 6px; margin-top: 6px;">
+                            <button class="btn-app" onclick="openInTikTokApp('${item.unique_id}', '${item.tiktok_user_id}')">
+                                📱 Mở App
+                            </button>
+                            <a href="https://www.tiktok.com/@${item.unique_id}" target="_blank" class="btn-web">
+                                🌐 Mở Web
+                            </a>
+                        </div>
+                    </td>
+                    <td>${timeColumnHTML}</td>
+                    <td style="max-width: 360px;">${galleryBadges}</td>
+                    <td>${diamondColumnHTML}</td>
+                    <td><span class="badge-gifter">💎 Lv. ${item.gifter_level}</span></td>
+                    <td>
+                        ${Number(item.fanclub_level) > 0 
+                            ? `<span class="badge-fanclub">🧡 Cấp ${item.fanclub_level}</span>`
+                            : `<span class="sub-text">Chưa gia nhập</span>`
+                        }
+                    </td>
+                    <td>${mucChoiHTML}</td>
+                    <td>${screenshotHTML}</td>
+                </tr>
+            `;
+        }
+
+        function renderAllRows() {
+            if (!allWhaleRecords || allWhaleRecords.length === 0) return;
+            const prioritizeMale = document.getElementById('prioritizeMaleCheckbox').checked;
+            const regionFilter = document.getElementById('regionFilterSelect')?.value || 'all';
+
+            let list = allWhaleRecords.filter(item => {
+                if (regionFilter === 'all') return true;
+                return detectRegionClient(item) === regionFilter;
+            });
+
+            if (prioritizeMale) {
+                list.sort((a, b) => {
+                    const aMale = (a.gender || 'Nam') === 'Nam' ? 1 : 0;
+                    const bMale = (b.gender || 'Nam') === 'Nam' ? 1 : 0;
+                    if (bMale !== aMale) return bMale - aMale;
+                    return (b.id || 0) - (a.id || 0);
+                });
+            }
+
+            tbody.innerHTML = list.length > 0
+                ? list.map(createRowHTML).join('')
+                : `<tr><td colspan="9" class="empty-row">Không có User nào khớp bộ lọc hiện tại.</td></tr>`;
+        }
+
+        fetch('/api/whales')
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0) {
+                    allWhaleRecords = data;
+                    renderAllRows();
+                }
+            })
+            .catch(err => console.error('Lỗi tải dữ liệu:', err));
+
+        socket.on('new_whale_donate', (record) => {
+            allWhaleRecords.unshift(record);
+            renderAllRows();
+        });
+
+        function startBot() {
+            const btn = document.getElementById('startBtn');
+            const mode = document.getElementById('modeSelect').value;
+            const keyword = document.getElementById('keywordInput').value;
+
+            btn.disabled = true;
+            btn.innerText = '⏳ Đang quét 5s/phòng...';
+
+            fetch('/api/start-bot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode, keyword })
+            }).then(() => {
+                document.getElementById('statusBadge').innerText = '🟢 Đang quét 5s/Phòng: ' + keyword;
+            }).catch(() => {
+                btn.disabled = false;
+                btn.innerText = '🚀 Chạy Auto-Scroll (5s/Phòng)';
+            });
+        }
+    </script>
+</body>
+</html>
